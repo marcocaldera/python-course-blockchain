@@ -1,3 +1,5 @@
+MINING_REWARD = 10
+
 genesis_block = {
     'previous_hash': '',
     'index': 0,
@@ -5,18 +7,37 @@ genesis_block = {
 }
 blockchain = [genesis_block]
 open_transactions = []
+# We are the owner of this blockchain node, hence this is our identifier (e.g. for sending coins)
 owner = 'Marco'
-# participants = set(['Marco'])
+# Registered participants: Ourself + other people sending / receiving coins
 participants = {'Marco'}
+# participants = set(['Marco'])
 
 
 def hash_block(block):
+    """Hashes a block and returns a string representation of it.
+
+    Arguments:
+        :block: The block that should be hashed.
+    """
     return '-'.join([str(block[key]) for key in block])
 
 
 def get_balance(participant):
+    """Calculate and return the balance for a participant.
+
+    Arguments:
+        :participant: The person for whom to calculate the balance.
+    """
+
+    # How much  the sender spent in this blockchain
     tx_sender = [[tx['amount'] for tx in block['transactions']
                   if tx['sender'] == participant] for block in blockchain]
+
+    # How much the sender spent in this particolar block (not already mined)
+    open_tx_sender = [tx['amount']
+                      for tx in open_transactions if tx['sender'] == participant]
+    tx_sender.append(open_tx_sender)
 
     amount_sent = 0
     for tx in tx_sender:
@@ -30,7 +51,7 @@ def get_balance(participant):
     for tx in tx_recipient:
         if len(tx) > 0:
             amount_received += tx[0]
-    return amount_received - amount_sent,
+    return amount_received - amount_sent
 
 
 def get_last_blockchain_value():
@@ -39,9 +60,13 @@ def get_last_blockchain_value():
         return None
     return blockchain[-1]
 
-# This function accepts two arguments.
-# One required one (transaction_amount) and one optional one (last_transaction)
-# The optional one is optional because it has a default value => [1]
+
+def verify_transaction(transaction):
+    """
+    Check if the sender has the amount needed to open the new transaction
+    """
+    sender_balance = get_balance(transaction['sender'])
+    return sender_balance >= transaction['amount']
 
 
 def add_transaction(recipient, sender=owner, amount=1.0):
@@ -57,9 +82,12 @@ def add_transaction(recipient, sender=owner, amount=1.0):
         'recipient': recipient,
         'amount': amount
     }
-    open_transactions.append(transaction)
-    participants.add(sender)
-    participants.add(recipient)
+    if verify_transaction(transaction):
+        open_transactions.append(transaction)
+        participants.add(sender)
+        participants.add(recipient)
+        return True
+    return False
 
 
 def mine_block():
@@ -71,13 +99,22 @@ def mine_block():
     # pass  # Non fa nulla
     last_block = blockchain[-1]
 
-    #hashed_block = str([last_block[key] for key in last_block])
+    # hashed_block = str([last_block[key] for key in last_block])
     hashed_block = hash_block(last_block)
+
+    reward_transaction = {
+        'sender': 'MINING',
+        'recipient': owner,
+        'amount': MINING_REWARD
+    }
+
+    copied_transaction = open_transactions[:]  #  deep copy
+    open_transactions.append(reward_transaction)
 
     block = {
         'previous_hash': hashed_block,
         'index': len(blockchain),
-        'transactions': open_transactions
+        'transactions': copied_transaction
     }
     blockchain.append(block)
     return True
@@ -134,7 +171,10 @@ while waiting_for_input:
         tx_data = get_transaction_value()
         recipient, amount = tx_data
         # Add the transaction amount to the blockchain
-        add_transaction(recipient, amount=amount)
+        if add_transaction(recipient, amount=amount):
+            print('Added transaction!')
+        else:
+            print('Transaction failed!')
         print(open_transactions)
     elif user_choice == '2':
         if mine_block():
@@ -161,7 +201,8 @@ while waiting_for_input:
         print('Invalid blockchain!')
         # Break out of the loop
         break
-    print(get_balance('Max'))
+    print('Marco balance: ', get_balance('Marco'))
+
 else:
     print('User left!')
 
