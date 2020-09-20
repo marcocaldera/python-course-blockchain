@@ -7,13 +7,7 @@ import pickle
 
 MINING_REWARD = 10
 
-genesis_block = {  # dummy values
-    'previous_hash': '',
-    'index': 0,
-    'transactions': [],
-    'proof': 100
-}
-blockchain = [genesis_block]
+blockchain = []
 open_transactions = []
 # We are the owner of this blockchain node, hence this is our identifier (e.g. for sending coins)
 owner = 'Marco'
@@ -23,55 +17,76 @@ participants = {'Marco'}
 
 
 def load_data():
-    with open('blockchain.txt', mode='r') as f:  # read binary file
-        # file_content = pickle.loads(f.read())
-        # blockchain = file_content['chain']
-        # open_transactions = file_content['ot']
-        global blockchain
-        global open_transactions
-        """
-        JSON Format
-        Dobbiamo riprendere i dati e ritrasformarmi in OrderedDict mentre pickle riesce a mantenere
-        il riferimento agli OrderedDict quando li salviamo su file
-        """
-        file_content = f.readlines()
-        blockchain = json.loads(file_content[0][:-1])  # without \n
-        blockchain = [{
-            'previous_hash': block['previous_hash'],
-            'index': block['index'],
-            'transactions': [OrderedDict(
-                [('sender', tx['sender']),
-                 ('recipient', tx['recipient']),
-                 ('amount', tx['amount'])]) for tx in block['transactions']],
-            'proof': block['proof']
-        } for block in blockchain]
+    global blockchain
+    global open_transactions
+    try:
+        with open('blockchain.txt', mode='r') as f:  # read binary file
+            # file_content = pickle.loads(f.read())
+            # blockchain = file_content['chain']
+            # open_transactions = file_content['ot']
+            """
+            JSON Format
+            Dobbiamo riprendere i dati e ritrasformarmi in OrderedDict mentre pickle riesce a mantenere
+            il riferimento agli OrderedDict quando li salviamo su file
+            """
+            file_content = f.readlines()
+            blockchain = json.loads(file_content[0][:-1])  # without \n
+            blockchain = [{
+                'previous_hash': block['previous_hash'],
+                'index': block['index'],
+                'transactions': [OrderedDict(
+                    [('sender', tx['sender']),
+                     ('recipient', tx['recipient']),
+                     ('amount', tx['amount'])]) for tx in block['transactions']],
+                'proof': block['proof']
+            } for block in blockchain]
 
-        open_transactions = json.loads(file_content[1])
+            open_transactions = json.loads(file_content[1])
 
-        updated_transactions = []
-        for tx in open_transactions:
-            updated_transaction = OrderedDict(
-                [('sender', tx['sender']),
-                 ('recipient', tx['recipient']),
-                 ('amount', tx['amount'])])
-            updated_transactions.append(updated_transaction)
-        open_transactions = updated_transactions
+            updated_transactions = []
+            for tx in open_transactions:
+                updated_transaction = OrderedDict(
+                    [('sender', tx['sender']),
+                     ('recipient', tx['recipient']),
+                     ('amount', tx['amount'])])
+                updated_transactions.append(updated_transaction)
+            open_transactions = updated_transactions
+    # FileNotFoundError è contenuto tra gli errori IOError e quindi usiamo quel gruppo li
+    except (IOError, IndexError):
+        print('File Not Found')
+        genesis_block = {  # dummy values
+            'previous_hash': '',
+            'index': 0,
+            'transactions': [],
+            'proof': 100
+        }
+        blockchain = [genesis_block]
+        open_transactions = []
+    except ValueError:
+        print('Value error')
+    except:  # altri errori
+        print('All other errors')
+    finally:  # viene eseguito in ogni caso sia in caso di erorre che non
+        print('Cleanup!')
 
 
 load_data()
 
 
 def save_data():
-    # wb se vogliamo salvare binary data (pikle)
-    with open('blockchain.txt', mode='w') as f:
-        f.write(json.dumps(blockchain))
-        f.write('\n')
-        f.write(json.dumps(open_transactions))
-        # save_data = {
-        #     'chain': blockchain,
-        #     'ot': open_transactions
-        # }
-        # f.write(pickle.dumps(save_data))
+    try:
+        # wb se vogliamo salvare binary data (pikle)
+        with open('blockchain.txt', mode='w') as f:
+            f.write(json.dumps(blockchain))
+            f.write('\n')
+            f.write(json.dumps(open_transactions))
+            # save_data = {
+            #     'chain': blockchain,
+            #     'ot': open_transactions
+            # }
+            # f.write(pickle.dumps(save_data))
+    except IOError:
+        print('Saving failed!')
 
 
 def valid_proof(transactions, last_hash, proof):
